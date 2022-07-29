@@ -1,0 +1,347 @@
+<?php
+require_once("library/db_connect.php"); 
+include('resize-class.php');   
+include('resize_class.php');
+
+    $allowedExts = array("jpg", "jpeg", "gif", "png","pjpeg");
+    $allowedmimetypes = array("image/jpeg", "image/pjpeg", "image/gif", "image/png","image/jpg");
+        $upload_path = getcwd()."/upload/";
+    
+        
+        #print 'temp name:'.$_FILES["upload-image"]["tmp_name"].'<br />';
+        #print 'name:'.$_FILES["upload-image"]["name"].'<br />';
+        $imgprops = getimagesize($_FILES['upload-image']['tmp_name']);
+        #print_r($imgprops);
+
+        /* 
+if ((($_FILES["upload-image"]["type"] == "image/gif")
+        || ($_FILES["upload-image"]["type"] == "image/jpeg")
+        || ($_FILES["upload-image"]["type"] == "image/pjpeg")
+        || ($_FILES["upload-image"]["type"] == "image/png")
+        || ($_FILES["upload-image"]["type"] == "jpg"))
+        && ($_FILES["upload-image"]["size"] < 307200))
+*/
+        if ((($imgprops["mime"] == "image/gif")
+        || ($imgprops["mime"] == "image/jpeg")
+        || ($imgprops["mime"] == "image/pjpeg")
+        || ($imgprops["mime"] == "image/png")
+        || ($imgprops["mime"] == "jpg"))
+        && ($_FILES["upload-image"]["size"] < 307200))
+          {
+              if ($_FILES["upload-image"]["error"] == 0)
+                {
+                    $result=submitDetails($_POST);
+                    $upload_image=$result['sighting_id']."-".$_FILES['upload-image']['name'];  
+                                        
+                    if (!file_exists($upload_path.$upload_image))
+                      {   
+        #print($imgprops['mime']);
+        #print(in_array($imgprops['mime'],$allowedmimetypes) ); 
+        if(isset($imgprops['mime']) and in_array($imgprops['mime'],$allowedmimetypes)) { 
+            
+                          $k = move_uploaded_file($_FILES["upload-image"]["tmp_name"],$upload_path.$upload_image);
+        #print $k.'<br />';
+        #print 'uploadpath:'.$upload_path.$upload_image;
+                          $image=new resize($upload_path.$upload_image);
+                          if (!is_dir('upload'))
+                          {
+                             mkdir('upload');
+                          }      
+                             
+                          if (!is_dir($upload_path.'Thumbnail')) 
+                          {
+                             mkdir($upload_path.'Thumbnail');
+                          }
+                            
+                          if (!is_dir($upload_path.'Large')) 
+                          {
+                            mkdir($upload_path.'Large');
+                          }
+                          
+                          $image_size=getimagesize($upload_path.$upload_image);
+                          if($image_size[0]<=1024)
+                          {
+                             if($image_size[0]>300)
+                             {
+                               $image->resizeImage(300,200,'crop');
+                               $image->saveImage($upload_path.'Thumbnail/'.$upload_image,100);
+                             }
+                             if($image_size[0]>620)
+                             {
+                               $image->resizeImage(620,'', 'auto');
+                               $image->saveImage($upload_path.'Large/'.$upload_image,100);
+                             }
+                               $image->resizeImage(300,200,'crop');
+                               $image->saveImage($upload_path.'Thumbnail/'.$upload_image,100);
+                             
+                               $dbQuery = mysqli_query($con,"INSERT INTO images VALUES (null,'".$result['sighting_id']."','".$upload_image."','0')");
+                               $dbquery="select * from images ORDER BY image_id DESC LIMIT 0,1";
+                               $images=mysqli_query($con,$dbquery);  
+                               $result1=mysqli_fetch_array($images);
+                             
+                               $dbquery="select * from submitter where submitter_id='".$result['submitter_id']."'  ";
+                             
+                               $submitter_details=mysqli_query($con,$dbquery);  
+                               $submitter_details=mysqli_fetch_array($submitter_details);
+                             
+                               $dbquery="select * from sighting where submitter_id='".$result['submitter_id']."'  ";
+                             
+                               $sighting_details=mysqli_query($con,$dbquery);   
+                               $sighting_details=mysqli_fetch_array($sighting_details);
+                             
+                               $dbquery="select species_name from species where species_id='".$sighting_details['species_id']."'  ";       
+                             
+                               $species_details=mysqli_query($con,$dbquery);   
+                               $species_details=mysqli_fetch_array($species_details);
+                                                         
+                               $fb_share_link = "https://www.facebook.com/dialog/feed?
+      app_id=129839053836587&link=".urlencode("http://hornbills.in/photo.php?p=".$result1['image_id'])."&picture=http://hornbills.in/upload/fbthumb/".$upload_image."&name=".urlencode("I just reported a hornbill sighting on Hornbill Watch")."&
+      caption=&description=".urlencode("Wildlife enthusiasts & photographers report sightings of hornbills in India. Click to view/report.")."&redirect_uri=".urlencode("http://hornbills.in/photo.php?p=".$result1['image_id']);
+                              
+                               //$message =  "<h2>Upload successful!</h2><p>Thank you for submitting your photo. Your image will appear on the gallery post approval. You may then share it on Facebook..</p><p>Would you like to <a href='upload.php'>submit another sighting</a>?</p>";   
+                                                            
+                                                             $photo_id = $result1['image_id'];
+                                                             
+                                                             $message =  "<h2>Upload successful!</h2><p>Thank you for submitting your sighting. Would you like to <a href='upload.php'>submit another sighting</a>?</p>
+                                                             <p class='muted'>Please note: Your submission ID is <strong>#".$photo_id."</strong>. If you want to make any corrections to the submission, please <a href='mailto:aparajita@ncf-india.org'>write to us</a> and mention the submission ID along with the changes.</p>";
+                                                        
+                               setcookie("SubmitterName",$submitter_details['name'],time()+604800);
+                               setcookie("EmailId",$submitter_details['email_id'],time()+604800);
+                               setcookie("MobileNo",$submitter_details['mobile_no'],time()+604800);
+                                                             /*setcookie("Species",$species_details['species_id'],time()+604800); 
+                                                             setcookie("Month",$_POST['month'],time()+604800);
+                                                             setcookie("Year",$_POST['year'],time()+604800);
+                                                             setcookie("Incident",$_POST['typeofincident'],time()+604800);*/
+                
+                                             
+                      }
+                          else
+                          {
+                                   $message = "<h2>Image resolution is too large</h2> <p>Looks like the file you are uploading is wider than 1024 pixels. Please reduce the resolution of the image and upload again.</p><p><a href='./upload.php'>Click here</a> to try again.</p>";
+                          }
+}
+else                       {
+                                   $message = "<h2>Not a valid image type that we accept.</h2> <p>Looks like the file you are uploading is not a JPEG, GIF or a PNG.</p><p><a href='./upload.php'>Click here</a> to try again.</p>";
+                          }
+
+                      }           
+                      else
+                      {
+                                   $message = "<h2>File already exists!</h2> <p>Please rename the file and upload again.</p><p><a href='./upload.php'>Click here</a> to try again.</p>";
+                      }           
+                }
+                else
+                {
+                   $message = "<h2>File contains some errors</h2> <p>Looks like the file you are uploading contains some errors. Please upload another copy.</p><p><a href='./upload.php'>Click here</a> to try again.</p>";
+                }
+           }
+           else
+           {
+
+                    $result=submitDetails($_POST);
+
+                             
+                               $dbQuery = mysqli_query($con,"INSERT INTO images VALUES (null,'".$result['sighting_id']."','NA','0')");
+                               $dbquery="select * from images ORDER BY image_id DESC LIMIT 0,1";
+                               $images=mysqli_query($con,$dbquery);  
+                               $result1=mysqli_fetch_array($images);
+                             
+                               $dbquery="select * from submitter where submitter_id='".$result['submitter_id']."'  ";
+                             
+                               $submitter_details=mysqli_query($con,$dbquery);  
+                               $submitter_details=mysqli_fetch_array($submitter_details);
+                             
+                               $dbquery="select * from sighting where submitter_id='".$result['submitter_id']."'  ";
+                             
+                               $sighting_details=mysqli_query($con,$dbquery);   
+                               $sighting_details=mysqli_fetch_array($sighting_details);
+                             
+                               $dbquery="select species_name from species where species_id='".$sighting_details['species_id']."'  ";       
+                             
+                               $species_details=mysqli_query($con,$dbquery);   
+                               $species_details=mysqli_fetch_array($species_details);
+                                                         
+                               $fb_share_link = "https://www.facebook.com/dialog/feed?
+      app_id=129839053836587&link=".urlencode("http://hornbills.in/photo.php?p=".$result1['image_id'])."&picture=http://hornbills.in/upload/fbthumb/".$upload_image."&name=".urlencode("I just reported a hornbill sighting on Hornbill Watch")."&
+      caption=&description=".urlencode("Wildlife enthusiasts & photographers report sightings of hornbills in India. Click to view/report.")."&redirect_uri=".urlencode("http://hornbills.in/photo.php?p=".$result1['image_id']);
+            
+                                                             $photo_id = $result1['image_id'];
+                              
+                               $message =  "<h2>Upload successful!</h2><p>Thank you for submitting your sighting. Would you like to <a href='upload.php'>submit another sighting</a>?</p>
+                                                             <p class='muted'>Please note: Your submission ID is <strong>#".$photo_id."</strong>. If you want to make any corrections to the submission, please <a href='mailto:aparajita@ncf-india.org'>write to us</a> and mention the submission ID along with the changes.</p>";   
+                                                        
+                               
+                               setcookie("SubmitterName",$submitter_details['name'],time()+604800);
+                               setcookie("EmailId",$submitter_details['email_id'],time()+604800);
+                               setcookie("MobileNo",$submitter_details['mobile_no'],time()+604800);
+                                                             /*setcookie("Species",$species_details['species_id'],time()+604800); 
+                                                             setcookie("Month",$_POST['month'],time()+604800);
+                                                             setcookie("Year",$_POST['year'],time()+604800);
+                                                             setcookie("Incident",$_POST['typeofincident'],time()+604800);*/
+                                
+                                                
+     
+           }                         
+
+?> 
+<?php 
+
+    function submitDetails($data) 
+    {
+      //print_r($data); exit;
+        $mobileno=$data['mobile_no'];
+        $nearest_town=$data['nearest_town'];
+        $sigthing_year=$data['year'];
+    	if(!is_numeric($mobileno)) {
+		$msg = '<span class="error"> Data entered was not numeric</span>';
+		}
+       
+        $sigthing_month=$data['month']; 
+        $sigthing_time = $sigthing_month." ".$sigthing_year;
+        $sigthing_time_details = strtotime($sigthing_time);
+        $sigthing_time_details = date('Y-m-d 00:00:00',$sigthing_time_details);
+       
+       $dbquery="insert into submitter values('','".$data['name']."','".$data['email']."','".$mobileno."',Now())";
+        mysqli_query($con,$dbquery);
+        $submitter_id=mysql_insert_id();
+        $dbquery="select StateName from  state_master where State_Id='".$data['location-state']."'";
+        $result=mysqli_query($con,$dbquery);
+        $result=mysqli_fetch_array($result);
+        $state_name=$result['StateName'];
+       
+        $dbquery="select district_name from  district_master where district_id='".$data['district']."'";      
+        $result=mysqli_query($con,$dbquery);
+        $result=mysqli_fetch_array($result);
+        $district_name=$result['district_name'];
+        if($nearest_town=='')
+        {
+               $sigthing_place_name=$district_name.", ".$state_name;
+        }
+        else if($district_name=='')
+        {
+             $sigthing_place_name=$nearest_town.", ".$state_name;
+        }
+        else if($state_name=='')
+        {
+            $sigthing_place_name=$nearest_town.", ".$district_name;
+        }
+        else
+        $sigthing_place_name=$nearest_town.", ".$district_name.", ".$state_name;
+     
+        $data2=explode(',',$data['latitude_longitude']);
+        $latitude=$data2[0];
+        $longitude=$data2[1];
+        $species_name = $data['species'];
+        $activity = $data['activity'];
+        $day = $data['day'];
+        $month = $data['month'];
+        $year = $data['year'];
+        $sighting_date = $year."-".$month."-".$day ; 
+
+        if($data['location-state'] == -1)
+        {
+            $dbquery="insert into sighting values('','".$submitter_id."','".$data['species']."','".$data['activity']."','".$data['typeofincident']."','".$data['numbers_seen']."','".$data['age']."','".$data['habitat']."','".$data['location-type']."','".$data['sighting_time']."','".$data['state']."','".$data['location-pa']."','".$latitude."','".$longitude."','".$data['town']."','".$data['district']."','".$data['state']."','','".$data['typeofincident']."','".mysql_real_escape_string(strip_tags($data['sightingdesc']))."',NOW(),'".$sighting_date."')";     
+        }
+        else
+        {
+            $dbquery="insert into sighting values('','".$submitter_id."','".$data['species']."','".$data['activity']."','".$data['typeofincident']."','".$data['numbers_seen']."','".$data['age']."','".$data['habitat']."','".$data['location-type']."','".$data['sighting_time']."','".$data['location-state']."','".$data['location-pa']."','".$latitude."','".$longitude."','".$data['town']."','".$data['district']."','".$data['state']."','','".$data['typeofincident']."','".mysql_real_escape_string(strip_tags($data['sightingdesc']))."',NOW(),'".$sighting_date."')"; 
+        }
+        
+        
+        mysqli_query($con,$dbquery);
+        $sigthing_id=mysql_insert_id();
+        $result_array=array('sighting_id'=>$sigthing_id,'submitter_id'=>$submitter_id);
+        
+        sendemail($data['name'],$sigthing_id);    
+        
+        return $result_array;
+    }
+        
+        include_once('header.php');
+?>
+
+<div class="content clearfix">
+  <div class="grid_8">
+    <?php echo $message; ?>                                                     
+    </div>
+</div> <!-- content -->
+
+
+<? 
+  function sendemail($submitter_name,$image_id)
+    {
+        
+     $to= 'frogmouth@gmail.com, aparajita@ncf-india.org, rohit@ncf-india.org';
+     $cc = '';
+     $subject = "Hornbill Watch - New Submission by ".$submitter_name;
+     $message="<p>Hello,</p><p>
+              ".$submitter_name." has submitted a new sighting. <a href='http://hornbills.in/admin/submission_details.php?id=".$image_id."' target='_blank'>Click here</a> to view/approve the sighting.</p><p>Thanks!</p>";
+   
+   $from = 'donotreply@hornbills.in';
+                 $headers =  'MIME-Version: 1.0' . "\r\n" .
+                               'Content-type: text/html; charset=utf-8' . "\r\n" .
+                               'From: Hornbill Watch <donotreply@hornbills.in>'."\r\n" .
+                               'Sender: Hornbill Watch <donotreply@hornbills.in>' . ">\r\n" .
+                               'Reply-To: Hornbill Watch <donotreply@hornbills.in>' . ">\r\n";
+                           if(!empty($cc)) {
+                             $headers .= 'Cc: ' . strip_tags($cc) . "\r\n";
+                           }
+                           if(!empty($bcc)) {
+                             $headers .= 'BCc: ' . strip_tags($bcc) . "\r\n";
+                           }
+                   $headers .= 'X-Mailer: hornbills.in';
+
+
+        mail($to,$subject,$message,$headers);
+    }
+?>
+  
+<?php include_once('footer.php'); ?>
+<?php
+function getimagesizeReal($image) {
+
+    $imageTypes = array (
+            IMAGETYPE_GIF,
+            IMAGETYPE_JPEG,
+            IMAGETYPE_PNG,
+            IMAGETYPE_SWF,
+            IMAGETYPE_PSD,
+            IMAGETYPE_BMP,
+            IMAGETYPE_TIFF_II,
+            IMAGETYPE_TIFF_MM,
+            IMAGETYPE_JPC,
+            IMAGETYPE_JP2,
+            IMAGETYPE_JPX,
+            IMAGETYPE_JB2,
+            IMAGETYPE_SWC,
+            IMAGETYPE_IFF,
+            IMAGETYPE_WBMP,
+            IMAGETYPE_XBM,
+            IMAGETYPE_ICO 
+    );
+    $info = getimagesize ( $image );
+    $width = @$info [0];
+    $height = @$info [1];
+    $type = @$info [2];
+    $attr = @$info [3];
+    $bits = @$info ['bits'];
+    $channels = @$info ['channels'];
+    $mime = @$info ['mime'];
+
+    if (! in_array ( $type, $imageTypes )) {
+        return false; // Invalid Image Type ;
+    }
+    if ($width <= 1 && $height <= 1) {
+        return false; // Invalid Image Size ;
+    }
+
+    if($bits === 1)
+    {
+        return false; // One Bit Image .. You don't want that  ;
+    }
+    return $info ;
+}
+/** Validate captcha */
+
+
+?>
